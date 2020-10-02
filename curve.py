@@ -2,9 +2,16 @@ import numpy as np
 
 class Curve(object):
     def __init__(self,N):
-        self.N = N
-        self.us = _generate_us(N)
-        self.points = init_shape(self.us)
+        self.N          = N
+        self.us         = _generate_us(N)
+        self.points     = init_shape(self.us)
+        self.midpoints  = _calc_midpoints(self.points)
+        self.tm_vectors = _calc_tm_vectors(self.points)
+        self.nm_vectors = _calc_nm_vectors(self.tm_vectors)
+        self.thetas     = _calc_thetas(self.tm_vectors)
+        self.phis       = _calc_phis(self.thetas)
+        self.A          = _calc_A(self.points)
+        self.G          = _calc_G(self.points, self.A)
 
 def init_shape(us):
     points = []
