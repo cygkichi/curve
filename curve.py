@@ -5,6 +5,10 @@ class Curve(object):
         self.N          = N
         self.us         = _generate_us(N)
         self.points     = init_shape(self.us)
+        self.calc()
+
+    def calc(self):
+        self.rs         = _calc_rs(self.points)
         self.midpoints  = _calc_midpoints(self.points)
         self.tm_vectors = _calc_tm_vectors(self.points)
         self.nm_vectors = _calc_nm_vectors(self.tm_vectors)
@@ -12,13 +16,64 @@ class Curve(object):
         self.phis       = _calc_phis(self.thetas)
         self.A          = _calc_A(self.points)
         self.G          = _calc_G(self.points, self.A)
+        self.sins       = _calc_sins(self.phis)
+        self.coss       = _calc_coss(self.phis)
+        self.tans       = _calc_tans(self.phis)
+        self.t_vectors  = _calc_t_vectors(self.tm_vectors, self.coss)
+        self.n_vectors  = _calc_n_vectors(self.t_vectors)
+        self.psis       = _calc_psis(self.sins, self.rs)
+        self.ws         = _calc_ws(self.psis, self.coss)
+        self.kais       = _calc_kais2(self.rs, self.coss, self.tans)
+
+
+    def step(self,dt=0.001,t=True,n=True):
+        for i in range(self.N):
+            dx,dy =0,0
+            if(t):
+                dx += self.t_vectors[i][0]*self.ws[i]*dt
+                dy += self.t_vectors[i][1]*self.ws[i]*dt
+            if(n):
+                dx += (np.mean(self.kais) - self.kais[i])*self.n_vectors[i][0]*dt
+                dy += (np.mean(self.kais) - self.kais[i])*self.n_vectors[i][1]*dt
+            self.points[i][0] += dx
+            self.points[i][1] += dy
+        self.calc()
 
 def init_shape(us):
     points = []
     for u in us:
         p = 2*np.pi*u
-        x = 1*np.cos(p)
-        y = 1*np.sin(p)
+        r = 1 + 3*np.random.rand()
+        x = r*np.cos(p)
+        y = r*np.sin(p)
+        points.append([x,y])
+    return np.array(points)
+
+def init_shape3(us):
+    def shift_p(p):
+        if p > np.pi/4:
+            return shift_p(p - np.pi/2)
+        else:
+            return p
+    points = []
+    for u in us:
+        p = 2*np.pi*u
+        r = 3/np.cos(shift_p(p))
+        x = r*np.cos(p)
+        y = r*np.sin(p)
+        points.append([x,y])
+    return np.array(points)
+
+
+def init_shape2(us):
+    points = []
+    for u in us:
+        p = 2*np.pi*u
+        c1, c2 = 10, 1
+        d = c1*np.cos(2*p)
+        r = np.sqrt(d+np.sqrt(d**2+c2))
+        x = r*np.cos(p)
+        y = r*np.sin(p)
         points.append([x,y])
     return np.array(points)
 
@@ -78,7 +133,19 @@ def _calc_G(points, A):
         Gy += det*(y1 + y0)/(6*A)
     return [Gx,Gy]
 
+def _calc_sins(phis):
+    return np.sin(phis * 0.5)
+
+def _calc_coss(phis):
+    return np.cos(phis * 0.5)
+
+def _calc_tans(phis):
+    return np.tan(phis * 0.5)
+
 def _calc_t_vectors(tm_vectors, coss):
+    """
+    TODO: Refactoring with numpy
+    """
     N = len(tm_vectors)
     t_vectors = []
     for i in range(N):
@@ -89,10 +156,15 @@ def _calc_t_vectors(tm_vectors, coss):
             tx = (tm_vectors[i][0] + tm_vectors[i+1][0])/(2*coss[i])
             ty = (tm_vectors[i][1] + tm_vectors[i+1][1])/(2*coss[i])
         t_vectors.append([tx,ty])
-    return t_vectors
+    return np.array(t_vectors)
 
+def _calc_n_vectors(t_vectors):
+    return _calc_nm_vectors(t_vectors)
 
 def _calc_psis(sins, rs, omega=10.0):
+    """
+    TODO: Refactoring with numpy
+    """
     N = len(sins)
     L = sum(rs)
     psis = [0]
@@ -102,17 +174,30 @@ def _calc_psis(sins, rs, omega=10.0):
     return psis
 
 def _calc_ws(psis, coss):
+    """
+    TODO: Refactoring with numpy
+    """
     N = len(psis)
     ws = [0]
     for i in range(1,N):
         w = (ws[-1]*coss[i-1]+psis[i])/coss[i]
         ws.append(w)
     mean_w = sum(ws) / float(N)
-    ws = [w - mean_w + 0.5 for w in ws]
+    ws = [w - mean_w for w in ws]
     return ws
 
+def _calc_kais(rs, sins):
+    """
+    TODO: Refactoring with numpy
+    3 points
+    """
+    N = len(sins)
+    return np.array([2*sins[i]/(rs[i]+rs[i-1]) for i in range(N)])
 
-def _calc_kais(rs, tans):
-    N = len(tans)
-    return [(tans[i]+tans[i-1])/rs[i] for i in range(N)]
-
+def _calc_kais2(rs, coss, tans):
+    """
+    5 points
+    """
+    N = len(rs)
+    kais = np.array([(tans[i] + tans[i-1])/rs[i] for i in range(N)])
+    return np.array([(kais[i]+kais[ 0 if i == N-1 else i+1 ])/(2*coss[i]) for i in range(N)])
