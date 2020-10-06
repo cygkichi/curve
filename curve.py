@@ -1,10 +1,12 @@
 import numpy as np
+from PIL import Image
 
 class Curve(object):
     def __init__(self,N):
         self.N          = N
         self.us         = _generate_us(N)
-        self.points     = init_shape(self.us)
+        self.points     = init_shape3(self.us)
+        self.setup_externalforce('./sample_05.png')
         self.calc()
 
     def calc(self):
@@ -33,11 +35,42 @@ class Curve(object):
                 dx += self.t_vectors[i][0]*self.ws[i]*dt
                 dy += self.t_vectors[i][1]*self.ws[i]*dt
             if(n):
-                dx += (np.mean(self.kais) - self.kais[i])*self.n_vectors[i][0]*dt
-                dy += (np.mean(self.kais) - self.kais[i])*self.n_vectors[i][1]*dt
+                x,y = self.points[i]
+                ef  = self.exforce(x,y)
+                dx += 3*(-self.kais[i] + ef)*self.n_vectors[i][0]*dt
+                dy += 3*(-self.kais[i] + ef)*self.n_vectors[i][1]*dt
             self.points[i][0] += dx
             self.points[i][1] += dy
         self.calc()
+
+    def setup_externalforce(self, imagefile):
+        ims = np.array(Image.open(imagefile)).sum(axis=2)
+        ims_max = np.max(ims)
+        ims_min = np.min(ims)
+        self.ex_ims = 1 - (ims - ims_min)/(ims_max - ims_min)
+        self.ex_x0 = -5
+        self.ex_y0 = -5
+        self.ex_x1 = 5
+        self.ex_y1 = 5
+        self.ex_Nx = self.ex_ims.shape[0]
+        self.ex_Ny = self.ex_ims.shape[1]
+        self.ex_dx = (self.ex_x1 - self.ex_x0) / self.ex_Nx
+        self.ex_dy = (self.ex_y1 - self.ex_y0) / self.ex_Ny
+
+    def exforce(self, x, y):
+        """
+        x = ix*dx + x0 wo mitasu ix wo keisan suru.
+        """
+        ix = int(( x-self.ex_x0)/self.ex_dx)
+        iy = int((-y-self.ex_y0)/self.ex_dy)
+
+        # hamidashi shusei
+        ix = np.clip(ix,0, self.ex_Nx-1)
+        iy = np.clip(iy,0, self.ex_Ny-1)
+
+        return (3+12)*self.ex_ims[iy,ix]-3
+        # return (2+48)*self.ex_ims[iy,ix]-2
+
 
 def init_shape(us):
     points = []
@@ -58,7 +91,7 @@ def init_shape3(us):
     points = []
     for u in us:
         p = 2*np.pi*u
-        r = 3/np.cos(shift_p(p))
+        r = 4/np.cos(shift_p(p))
         x = r*np.cos(p)
         y = r*np.sin(p)
         points.append([x,y])
