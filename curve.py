@@ -6,7 +6,7 @@ class Curve(object):
         self.N          = N
         self.us         = _generate_us(N)
         self.points     = init_shape3(self.us)
-        self.setup_externalforce('./sample_05.png')
+        self.setup_externalforce('./sample_02.png')
         self.calc()
 
     def calc(self):
@@ -234,3 +234,25 @@ def _calc_kais2(rs, coss, tans):
     N = len(rs)
     kais = np.array([(tans[i] + tans[i-1])/rs[i] for i in range(N)])
     return np.array([(kais[i]+kais[ 0 if i == N-1 else i+1 ])/(2*coss[i]) for i in range(N)])
+
+
+def _is_intersected(point_a0, point_a1, point_b0, point_b1):
+    """
+    Check to see if the two line segments intersect.
+    if vec(b1-b0) + S*vec(a0-b0) + T*vec(a1-b0),
+    then (S+T>1) and (S>0) and (T>0),
+    then line_a and lineb are intersected.
+    """
+    ax0, ay0 = point_a0 - point_b0
+    ax1, ay1 = point_a1 - point_b0
+    bx1, by1 = point_b1 - point_b0
+
+    detA = ax0 * ay1 - ax1 * ay0
+
+    s = ( ay1*bx1 - ax1*by1)/detA
+    t = (-ay0*bx1 + ax0*by1)/detA
+
+    if (s+t>1) and (s>0) and (t>0):
+        return True
+    else:
+        return False

@@ -101,6 +101,26 @@ def test_calc_G(points, A, expected):
     res = c._calc_G(points, A)
     assert comp_array(res, expected)
 
+@pytest.mark.parametrize(
+    ('point_a0','point_a1','point_b0','point_b1','expected'),[
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([ 1, 1]),True),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([-1, 1]),False),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([ 1,-1]),False),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([-1,-1]),False),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.9,0.9]),True),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.5,0.51]),True),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.5,0.49]),False),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.2,0.2]),False),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.1,1.01]),True),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.1,0.8]),False),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([1.01,0.1]),True),
+        (np.array([1,0]),np.array([0,1]),np.array([0,0]),np.array([0.8,0.1]),False),
+])
+def test_is_intersected(point_a0, point_a1, point_b0, point_b1, expected):
+    res = c._is_intersected(point_a0, point_a1, point_b0, point_b1)
+    assert res is expected
+
+
 """
 @pytest.mark.parametrize(('points','expected'),[
     (t_points, t_tm_vectors)
