@@ -1,75 +1,32 @@
 import numpy as np
 from PIL import Image
 
-class Curve(object):
-    def __init__(self,N):
-        self.N          = N
-        self.us         = _generate_us(N)
-        self.points     = init_shape3(self.us)
-        self.setup_externalforce('./sample_02.png')
-        self.calc()
+class Curves(object):
+    def __init__(self):
+        self.num_curves = 0
+        self.curves     = {}
 
-    def calc(self):
-        self.rs         = _calc_rs(self.points)
-        self.midpoints  = _calc_midpoints(self.points)
-        self.tm_vectors = _calc_tm_vectors(self.points)
-        self.nm_vectors = _calc_nm_vectors(self.tm_vectors)
-        self.thetas     = _calc_thetas(self.tm_vectors)
-        self.phis       = _calc_phis(self.thetas)
-        self.A          = _calc_A(self.points)
-        self.G          = _calc_G(self.points, self.A)
-        self.sins       = _calc_sins(self.phis)
-        self.coss       = _calc_coss(self.phis)
-        self.tans       = _calc_tans(self.phis)
-        self.t_vectors  = _calc_t_vectors(self.tm_vectors, self.coss)
-        self.n_vectors  = _calc_n_vectors(self.t_vectors)
-        self.psis       = _calc_psis(self.sins, self.rs)
-        self.ws         = _calc_ws(self.psis, self.coss)
-        self.kais       = _calc_kais2(self.rs, self.coss, self.tans)
+    def add_curve(self, points):
+        self.num_curves += 1
+        self.curves[self.num_curves] = points
 
+def circle_points(x,y,r,N):
+    ps = 2*np.pi*np.arange(N)/N
+    xs = r*np.cos(ps) + x
+    ys = r*np.sin(ps) + y
+    return np.array([xs,ys]).T
 
-    def step(self,dt=0.001,t=True,n=True):
-        for i in range(self.N):
-            dx,dy =0,0
-            if(t):
-                dx += self.t_vectors[i][0]*self.ws[i]*dt
-                dy += self.t_vectors[i][1]*self.ws[i]*dt
-            if(n):
-                x,y = self.points[i]
-                ef  = self.exforce(x,y)
-                dx += 3*(-self.kais[i] + ef)*self.n_vectors[i][0]*dt
-                dy += 3*(-self.kais[i] + ef)*self.n_vectors[i][1]*dt
-            self.points[i][0] += dx
-            self.points[i][1] += dy
-        self.calc()
-
-    def setup_externalforce(self, imagefile):
-        ims = np.array(Image.open(imagefile)).sum(axis=2)
-        ims_max = np.max(ims)
-        ims_min = np.min(ims)
-        self.ex_ims = 1 - (ims - ims_min)/(ims_max - ims_min)
-        self.ex_x0 = -5
-        self.ex_y0 = -5
-        self.ex_x1 = 5
-        self.ex_y1 = 5
-        self.ex_Nx = self.ex_ims.shape[0]
-        self.ex_Ny = self.ex_ims.shape[1]
-        self.ex_dx = (self.ex_x1 - self.ex_x0) / self.ex_Nx
-        self.ex_dy = (self.ex_y1 - self.ex_y0) / self.ex_Ny
-
-    def exforce(self, x, y):
-        """
-        x = ix*dx + x0 wo mitasu ix wo keisan suru.
-        """
-        ix = int(( x-self.ex_x0)/self.ex_dx)
-        iy = int((-y-self.ex_y0)/self.ex_dy)
-
-        # hamidashi shusei
-        ix = np.clip(ix,0, self.ex_Nx-1)
-        iy = np.clip(iy,0, self.ex_Ny-1)
-
-        return (3+12)*self.ex_ims[iy,ix]-3
-        # return (2+48)*self.ex_ims[iy,ix]-2
+def square_points(x,y,d,N):
+    def shift_p(p):
+        if p > np.pi/4:
+            return shift_p(p - np.pi/2)
+        else:
+            return p
+    ps = 2*np.pi*np.arange(N)/N
+    rs = np.array([d/np.cos(shift_p(p)) for p in ps])
+    xs = rs*np.cos(ps) + x
+    ys = rs*np.sin(ps) + y
+    return np.array([xs,ys]).T
 
 
 def init_shape(us):
