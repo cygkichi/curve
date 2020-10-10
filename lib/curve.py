@@ -2,14 +2,14 @@ import numpy as np
 from PIL import Image
 
 class Curve(object):
-    def __init__(self,N):
-        self.N          = N
-        self.us         = _generate_us(N)
-        self.points     = init_shape3(self.us)
+    def __init__(self,points):
+        self.points = points
+        self.N = len(self.points)
         self.setup_externalforce('./sample_02.png')
         self.calc()
 
     def calc(self):
+        self.is_inside  = np.zeros(len(self.points), dtype=np.bool)
         self.rs         = _calc_rs(self.points)
         self.midpoints  = _calc_midpoints(self.points)
         self.tm_vectors = _calc_tm_vectors(self.points)
@@ -36,9 +36,11 @@ class Curve(object):
                 dy += self.t_vectors[i][1]*self.ws[i]*dt
             if(n):
                 x,y = self.points[i]
-                ef  = self.exforce(x,y)
-                dx += 3*(-self.kais[i] + ef)*self.n_vectors[i][0]*dt
-                dy += 3*(-self.kais[i] + ef)*self.n_vectors[i][1]*dt
+                #ef  = self.exforce(x,y)
+                #dx += 3*(-self.kais[i] + ef)*self.n_vectors[i][0]*dt
+                #dy += 3*(-self.kais[i] + ef)*self.n_vectors[i][1]*dt
+                dx += 3*(self.kais.mean()-self.kais[i])*self.n_vectors[i][0]*dt
+                dy += 3*(self.kais.mean()-self.kais[i])*self.n_vectors[i][1]*dt
             self.points[i][0] += dx
             self.points[i][1] += dy
         self.calc()
@@ -249,6 +251,9 @@ def _is_intersected(point_a0, point_a1, point_b0, point_b1):
 
     detA = ax0 * ay1 - ax1 * ay0
 
+    if detA == 0.00:
+        return False
+
     s = ( ay1*bx1 - ax1*by1)/detA
     t = (-ay0*bx1 + ax0*by1)/detA
 
@@ -256,3 +261,119 @@ def _is_intersected(point_a0, point_a1, point_b0, point_b1):
         return True
     else:
         return False
+
+def _is_inside(point, points,
+               outer_point =np.array([1000.0, 1000.0])):
+    """
+    あるpointが、閉曲線pointsの内部に存在するか判定する。
+    """
+    cross_count = 0
+    point_a0 = point
+    point_a1 = outer_point
+    for i in range(len(points)):
+        point_b0 = points[i-1]
+        point_b1 = points[i]
+        if _is_intersected(point_a0,point_a1,
+                           point_b0,point_b1):
+            cross_count += 1
+    is_inside = cross_count%2 == 1
+    return is_inside
+
+def _cross_check(curves):
+    cross_list = []
+    inside_list = []
+    for c0_i, c0 in enumerate(curves):
+        last_point = c0.points[c0.N - 1]
+        is_inside  = np.array([_is_inside(last_point, c.points)
+                               for c_i, c in enumerate(curves)
+                               if c0_i != c_i]).any()
+        inside_list_0 = []
+        for line0_i in range(c0.N):
+            #これより line0 が交差しいるか判定する。
+            point00 = c0.points[line0_i -1]
+            point01 = c0.points[line0_i]
+            for c1_i, c1 in enumerate(curves):
+                for line1_i in range(c1.N):
+                    if (c0_i == c1_i) and (line0_i == line1_i):
+                        break
+                    point10 = c1.points[line1_i - 1]
+                    point11 = c1.points[line1_i]
+                    if _is_intersected(point00,point01,point10,point11):
+                        is_inside = np.invert(is_inside)
+                        if c0_i <= c1_i:
+                            cross_list.append([(c0_i,line0_i-1 if line0_i > 0 else c0.N-1),(c0_i,line0_i),
+                                               (c1_i,line1_i-1 if line1_i > 0 else c1.N-1),(c1_i,line1_i)])
+            inside_list_0.append(is_inside)
+        inside_list.append(inside_list_0)
+    return cross_list, inside_list
+
+
+def _combine_curves(curves, cross_list, inside_list):
+    trace_list =  [[ int(np.invert(inside)) for inside in  ilist]  for ilist in  inside_list]
+    # print(trace_list)
+    points_list = []
+    points = []
+    c0_i = 0
+    p0_i = 0
+    while True:
+        # print()
+        # print('start',c0_i,p0_i)
+
+        if trace_list[c0_i][p0_i] == 0:
+            points_list.append(np.array(points))
+            points = []
+            for c1_i, t in enumerate(trace_list):
+                for p1_i, v in enumerate(t):
+                    if v == 1:
+                        c0_i = c1_i
+                        p0_i = p1_i
+
+        c0 = curves[c0_i]
+        p0 = c0.points[p0_i]
+
+
+        #check cross_list
+        is_cross = False
+        cross_point = None
+        cross_id    = None
+        for i,cross in enumerate(cross_list):
+            for c1_i, p1_i in cross:
+                if (c0_i == c1_i) and (p0_i == p1_i):
+                    is_cross = True
+                    cross_point = cross
+                    cross_id    = i
+        # 交差している場合は、内外確認する
+        # もし内の場合は、点の入替を行う
+        is_inside = None
+        next_point = None
+        if is_cross:
+            is_inside = inside_list[c0_i][p0_i]
+            if not is_inside:
+                # cross_pointから曲線Noがことなり、外側の点を選択する。
+                for c1_i, p1_i in cross_point:
+                    if (c0_i != c1_i):
+                        if not inside_list[c1_i][p1_i]:
+                            # print(cross_id)
+                            cross_list.pop(cross_id)
+                            next_point = (c1_i, p1_i)
+
+        points.append(p0)
+        trace_list[c0_i][p0_i] = 0
+
+        # print(cross_list)
+        # print(c0_i,p0_i,is_cross,is_inside,trace_list, next_point)
+        # countup
+        if next_point is None:
+            p0_i += 1
+            if p0_i == c0.N:
+                p0_i = 0
+        else:
+            c0_i, p0_i = next_point
+
+        if sum([ sum(t) for t in trace_list]) == 0:
+            points_list.append(np.array(points))
+            break
+
+        # import time; time.sleep(1)
+
+    return points_list
