@@ -22,7 +22,8 @@ if __name__ == "__main__":
     plt.rcParams['axes.axisbelow'] = True
     lib.draw.draw_points(c.points, ps=120,pc=PC,lc=LC,lw=1)
     lib.draw.draw_edges(c.points, c.prev_points,lc=LC,lw=1)
+    # lib.draw.draw_vectors(c.points, c.points, lc=LC)
     plt.savefig('./test.png', dpi=100)
     plt.clf()
 
-
+li

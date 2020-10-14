@@ -21,3 +21,15 @@ def draw_edges(from_points,
         x0, y0 = from_xs[i], from_ys[i]
         x1, y1 = to_xs[i],   to_ys[i]
         plt.plot([x0,x1],[y0,y1],color=lc,lw=lw)
+
+def draw_vectors(points,
+                 vectors,
+                 lw=0.005,
+                 lc ="#222222",
+                 scale=10.0):
+    xs,  ys  = points.T
+    vxs, vys = vectors.T
+    plt.quiver(xs, ys, vxs, vys,
+               color=lc, scale=scale,
+               width=lw)
+
